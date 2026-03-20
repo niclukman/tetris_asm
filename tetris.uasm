@@ -1,0 +1,396 @@
+ROWS = 16
+COLS = 12
+
+. = 0x0000
+ADDC(R31, 0, R31)
+CMOVE(0, SP)
+BR(SPAWN, LP)
+
+LD(R31, CUR_PIECE_TYPE, R0)
+SHLC(R0, 2, R0)
+ADDC(R0, CHAR_TABLE, R0)
+LD(R0, 0, R0)
+PUSH(R0)
+BR(PAINT_PIECE, LP)
+
+MAIN_LOOP:
+	CMOVE(0x7FFF, R26)
+	SHLC(R26, 9, R26)
+WAIT:
+	SUBC(R26, 1, R26)
+	BNE(R26, WAIT)
+
+	PUSH(R31)
+	BR(PAINT_PIECE, LP)
+	| Piece falling
+	LD(R31, CUR_PIECE_X, R1)
+	LD(R31, CUR_PIECE_Y, R2)
+	ADDC(R2, 1, R2)
+
+	| COLLISION CHECK
+	LD(R31, CUR_PIECE_TYPE, R3)
+	LD(R31, CUR_PIECE_ROTATION, R4)
+	PUSH(R4)
+	PUSH(R3)
+	PUSH(R2)
+	PUSH(R1)
+	BR(CHECK_COLLISION, LP)
+	DEALLOCATE(4)
+	BNE(R0, DO_LOCK)
+
+	ST(R2, CUR_PIECE_Y, R31)
+
+	SHLC(R3, 2, R0)
+	LD(R0, CHAR_TABLE, R5)
+	PUSH(R5)
+	BR(PAINT_PIECE, LP)
+
+	BR(MAIN_LOOP)
+
+DO_LOCK:
+	BR(LOCK_PIECE, LP)
+	BR(SPAWN, LP)
+
+	LD(R31, CUR_PIECE_TYPE, R0)
+	SHLC(R0, 2, R0)
+	ADDC(R0, CHAR_TABLE, R0)
+	LD(R0, 0, R0)
+	PUSH(R0)
+	BR(PAINT_PIECE, LP)
+
+	BR(MAIN_LOOP)
+
+| CHECK_ROTATE:
+| 	LD(R31, CUR_PIECE_X, R1)
+| 	LD(R31, CUR_PIECE_Y, R2)
+| 	LD(R31, CUR_PIECE_TYPE, R3)
+| 	LD(R31, CUR_PIECE_ROTATION, R4)
+| 	ADDC(R4, 1, R4)
+| 	ANDC(R4, 3, R4)
+	
+| 	PUSH(R4)
+| 	PUSH(R3)
+| 	PUSH(R2)
+| 	PUSH(R1)
+| 	BR(CHECK_COLLISION, LP)
+| 	DEALLOCATE(4)
+| 	BEQ(R0, DO_ROTATE)
+
+| 	BR(MAIN_LOOP)
+
+| DO_ROTATE:
+| 	ST(R4, CUR_PIECE_ROTATION, R31)
+| 	BR(MAIN_LOOP)
+
+| CHECK_LEFT:
+| 	LD(R31, CUR_PIECE_X, R1)
+| 	LD(R31, CUR_PIECE_Y, R2)
+| 	LD(R31, CUR_PIECE_TYPE, R3)
+| 	LD(R31, CUR_PIECE_ROTATION, R4)
+| 	SUBC(R1, 1, R1)
+
+| 	PUSH(R4)
+| 	PUSH(R3)
+| 	PUSH(R2)
+| 	PUSH(R1)
+| 	BR(CHECK_COLLISION, LP)
+| 	DEALLOCATE(4)
+| 	BEQ(R0, DO_LEFT)
+
+| 	BR(MAIN_LOOP)
+
+| DO_LEFT:
+| 	ST(R1, CUR_PIECE_X, R31)
+| 	BR(MAIN_LOOP)
+
+| CHECK_RIGHT:
+| 	LD(R31, CUR_PIECE_X, R1)
+| 	LD(R31, CUR_PIECE_Y, R2)
+| 	LD(R31, CUR_PIECE_TYPE, R3)
+| 	LD(R31, CUR_PIECE_ROTATION, R4)
+| 	ADDC(R1, 1, R1)
+
+| 	PUSH(R4)
+| 	PUSH(R3)
+| 	PUSH(R2)
+| 	PUSH(R1)
+| 	BR(CHECK_COLLISION, LP)
+| 	DEALLOCATE(4)
+| 	BEQ(R0, DO_RIGHT)
+
+| 	BR(MAIN_LOOP)
+
+| DO_RIGHT:
+| 	ST(R1, CUR_PIECE_X, R31)
+| 	BR(MAIN_LOOP)
+
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||LOCK PIECE FUNCTION|||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+LOCK_PIECE:
+	PUSH(LP)
+	PUSH(BP)
+	MOVE(SP, BP)
+	PUSH(R1)	| PIECE X
+	PUSH(R2)	| PIECE Y
+	PUSH(R3)	| CELL X
+	PUSH(R4)	| CELL Y
+	PUSH(R5)	| BASE PIECE ADDRESS
+	PUSH(R6)	| BOARD X
+	PUSH(R7)	| BOARD Y
+	PUSH(R8)	| BOARD CELL OFFSET
+	PUSH(R9)	| PIECE TYPE
+	PUSH(R10)	| TEMP
+
+	| GET CURRENT POSITION
+	LD(R31, CUR_PIECE_X, R1)
+	LD(R31, CUR_PIECE_Y, R2)
+
+	| GET BASE PIECE ADDRESS
+	LD(R31, CUR_PIECE_TYPE, R9)
+	SHLC(R9, 2, R5)
+	LD(R31, CUR_PIECE_ROTATION, R10)
+	ADD(R5, R10, R0)
+	SHLC(R0, 2, R10)
+	LD(R10, SHAPE_TABLE, R5)
+
+	CMOVE(0, R4)
+LOCK_Y_LOOP:
+	CMOVE(0, R3)
+LOCK_X_LOOP:
+	| GET CELL VALUE
+	SHLC(R4, 2, R0)
+	ADD(R0, R3, R10)
+	SHLC(R10, 2, R0)
+
+	ADD(R5, R0, R10)
+	LD(R10, 0, R0)
+	BEQ(R0, LOCK_NEXT_CELL) | GO NEXT IF CELL VALUE IS 0
+
+	| GET BOARD COORDINATES
+	ADD(R1, R3, R6)
+	ADD(R2, R4, R7)
+
+	| GET BOARD CELL OFFSET
+	SHLC(R7, 3, R8)
+	SHLC(R7, 2, R0)
+	ADD(R8, R0, R8)
+	ADD(R8, R6, R0)
+	SHLC(R0, 2, R8)
+	SHLC(R9, 2, R0)
+	LD(R0, CHAR_TABLE, R10)
+	ST(R10, BOARD, R8)
+
+LOCK_NEXT_CELL:
+	ADDC(R3, 1, R3)
+	CMPLTC(R3, 4, R0)
+	BNE(R0, LOCK_X_LOOP)
+
+	ADDC(R4, 1, R4)
+	CMPLTC(R4, 4, R0)
+	BNE(R0, LOCK_Y_LOOP)
+
+	POP(R10)
+	POP(R9)
+	POP(R8)
+	POP(R7)
+	POP(R6)
+	POP(R5)
+	POP(R4)
+	POP(R3)
+	POP(R2)
+	POP(R1)
+	MOVE(BP, SP)
+	POP(BP)
+	POP(LP)
+	RTN()
+
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+|||||||||||||||||||||||||||COLLISION FUNCTION|||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+CHECK_COLLISION:
+	PUSH(LP)
+	PUSH(BP)
+	MOVE(SP, BP)
+	PUSH(R1)	| PIECE X
+	PUSH(R2)	| PIECE Y
+	PUSH(R3)	| PIECE TYPE
+	PUSH(R4)	| PIECE ROTATION
+	PUSH(R5)	| CELL X
+	PUSH(R6)	| CELL Y
+	PUSH(R7)	| Base piece address
+	PUSH(R8)	| CHECK X
+	PUSH(R9)	| CHECK Y
+	PUSH(R10)	| BOARD CELL ADDRESS
+	PUSH(R11)	| TEMP
+	LD(BP, -12, R1)
+	LD(BP, -16, R2)
+	LD(BP, -20, R3)
+	LD(BP, -24, R4)
+
+	| GET PIECE BASE ADDRESS
+	SHLC(R3, 2, R7)
+	ADD(R7, R4, R0)
+	SHLC(R0, 2, R0)
+	LD(R0, SHAPE_TABLE, R7)
+
+	CMOVE(0, R6)
+COLLISION_Y_LOOP:
+	CMOVE(0, R5)
+COLLISION_X_LOOP:
+	| GET CELL VALUE
+	SHLC(R6, 2, R0)
+	ADD(R0, R5, R11)
+	SHLC(R11, 2, R0)
+	ADD(R7, R0, R11)
+	LD(R11, 0, R0)
+	BEQ(R0, COLLISION_NEXT_CELL)
+
+	| GET BOARD COORDINATES
+	ADD(R1, R5, R8)
+	ADD(R2, R6, R9)
+
+	| CHECK IF BOARD LOCATION IS EMPTY
+	SHLC(R9, 3, R0)
+	SHLC(R9, 2, R10)
+	ADD(R0, R10, R10)
+	ADD(R10, R8, R11)
+	SHLC(R11, 2, R10)
+	LD(R10, BOARD, R0)
+
+	BNE(R0, COLLISION_FOUND)
+
+COLLISION_NEXT_CELL:
+	ADDC(R5, 1, R5)
+	CMPLTC(R5, 4, R0)
+	BNE(R0, COLLISION_X_LOOP)
+
+	ADDC(R6, 1, R6)
+	CMPLTC(R6, 4, R0)
+	BNE(R0, COLLISION_Y_LOOP)
+
+	CMOVE(0, R0)
+	BR(COLLISION_EXIT)
+
+COLLISION_FOUND:
+	CMOVE(1, R0)
+
+COLLISION_EXIT:
+	POP(R11)
+	POP(R10)
+	POP(R9)
+	POP(R8)
+	POP(R7)
+	POP(R6)
+	POP(R5)
+	POP(R4)
+	POP(R3)
+	POP(R2)
+	POP(R1)
+	MOVE(BP, SP)
+	POP(BP)
+	POP(LP)
+	RTN()
+
+halt:
+	BR(halt)
+
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+|||||||||||||||||||||||||SPAWN PIECE FUNCTION|||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+SPAWN:
+	PUSH(LP)
+	PUSH(BP)
+	MOVE(SP, BP)
+	CMOVE(4, R0)
+	ST(R0, CUR_PIECE_X, R31)
+	CMOVE(0, R0)
+	ST(R0, CUR_PIECE_Y, R31)
+	CMOVE(2, R0)
+	ST(R0, CUR_PIECE_TYPE, R31)
+	CMOVE(0, R0)
+	ST(R0, CUR_PIECE_ROTATION, R31)
+	MOVE(BP, SP)
+	POP(BP)
+	POP(LP)
+	RTN()
+
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+|||||||||||||||||||||||||PAINT PIECE FUNCTION|||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+PAINT_PIECE:
+	PUSH(LP)
+	PUSH(BP)
+	MOVE(SP, BP)
+	PUSH(R1) | Piece X
+	PUSH(R2) | Piece Y
+	PUSH(R3) | CELL X
+	PUSH(R4) | CELL Y
+	PUSH(R5) | SHAPE BASE ADDRESS
+	PUSH(R6) | BOARD CELL ADDRESS
+	PUSH(R7) | SHAPE CELL VALUE
+	PUSH(R8) | WRITE VALUE
+	PUSH(R9) | TEMP
+	PUSH(R10)| TEMP
+
+	LD(BP, -12, R8)
+
+	LD(R31, CUR_PIECE_X, R1)
+	LD(R31, CUR_PIECE_Y, R2)
+
+	LD(R31, CUR_PIECE_TYPE, R7)
+	SHLC(R7, 2, R5)
+	LD(R31, CUR_PIECE_ROTATION, R0)
+	ADD(R5, R0, R5)
+	SHLC(R5, 2, R5)
+	LD(R5, SHAPE_TABLE, R5)
+
+	CMOVE(0, R4)
+PAINT_Y_LOOP:
+	CMOVE(0, R3)
+PAINT_X_LOOP:
+	| GET CELL VALUE
+	SHLC(R4, 2, R0)
+	ADD(R0, R3, R0)
+	SHLC(R0, 2, R0)
+	ADD(R5, R0, R0)
+	LD(R0, 0, R7)
+	BEQ(R7, PAINT_NEXT_CELL)
+
+	ADD(R1, R3, R6)
+	ADD(R2, R4, R9)
+	SHLC(R9, 3, R10)
+	SHLC(R9, 2, R0)
+	ADD(R10, R0, R9)
+	ADD(R6, R9, R6)
+	SHLC(R6, 2, R6)
+
+	ST(R8, BOARD, R6)
+PAINT_NEXT_CELL:
+	ADDC(R3, 1, R3)
+	CMPLTC(R3, 4, R0)
+	BNE(R0, PAINT_X_LOOP)
+	ADDC(R4, 1, R4)
+	CMPLTC(R4, 4, R0)
+	BNE(R0, PAINT_Y_LOOP)
+
+	POP(R10)
+	POP(R9)
+	POP(R8)
+	POP(R7)
+	POP(R6)
+	POP(R5)
+	POP(R4)
+	POP(R3)
+	POP(R2)
+	POP(R1)
+	MOVE(BP, SP)
+	POP(BP)
+	POP(LP)
+	DEALLOCATE(1)
+	RTN()
+
